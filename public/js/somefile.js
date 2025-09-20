@@ -9,47 +9,25 @@ let selectedTime = '';
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
 let navigationHistory = ['home']; // Track navigation history for back button
-let patientId = ""
-let patientName = ""
-let patientEmail = ""
-// let appointments = []
-
-// Sample doctor data (this would normally come from your backend)
-const sampleDoctors = [
-    {
-        doctorId: 'DOC001',
-        name: 'Dr. Bob Smith',
-        specialty: 'General Practitioner (GP) / Family Doctor',
-        experience: '5',
-        availability: 'Mon-Fri, 9am-3pm',
-        avatar: 'B'
-    },
-    {
-        doctorId: 'DOC002',
-        name: 'Dr. Alice Johnson',
-        specialty: 'Pediatrics Specialist',
-        experience: '8',
-        availability: 'Mon-Wed-Fri, 10am-4pm',
-        avatar: 'A'
-    },
-    {
-        doctorId: 'DOC003',
-        name: 'Dr. David Wilson',
-        specialty: 'Cardiology Specialist',
-        experience: '12',
-        availability: 'Tue-Thu, 8am-2pm',
-        avatar: 'D'
-    }
-];
+let patientId = "";
+let patientName = "";
+let patientEmail = "";
 
 // Run on page load
 window.addEventListener('DOMContentLoaded', () => {
+    // Load persisted user data
+    patientId = localStorage.getItem('patientId') || '';
+    patientName = localStorage.getItem('patientName') || '';
+    patientEmail = localStorage.getItem('patientEmail') || '';
+
+    if (patientId) {
+        loggedIn = true;
+    }
+
     if (loggedIn) {
-        // User is logged in → show home page
         showPage('home');
-        toggleHeader()
+        toggleHeader();
     } else {
-        // User is not logged in → show login page
         showPage('login');
     }
 });
@@ -72,26 +50,20 @@ async function handleLogin(email, password) {
         const data = await response.json();
 
         if (response.ok) {
-            // Login successful
             loggedIn = true;
 
-            // // Store token if provided (optional)
-            // if (data.token) {
-            //     localStorage.setItem('authToken', data.token);
-            // }
+            patientId = data.patient.id;
+            patientName = data.patient.name;
+            patientEmail = data.patient.email;
 
-            // // Store user data if provided (optional)
-            // if (data.user) {
-            //     localStorage.setItem('userData', JSON.stringify(data.user));
-            // }
+            // Persist to localStorage
+            localStorage.setItem('patientId', patientId);
+            localStorage.setItem('patientName', patientName);
+            localStorage.setItem('patientEmail', patientEmail);
 
             alert('Login successful!');
-            patientId = data.patient.id
-            patientName = data.patient.name
-            patientEmail = data.patient.email
             showPage('home');
         } else {
-            // Login failed
             alert(data.message || 'Login failed. Please try again.');
         }
     } catch (error) {
@@ -117,14 +89,20 @@ async function handleSignup(name, email, password) {
         const data = await response.json();
 
         if (response.ok) {
-            // Signup successful
-            alert('Signup successful! Please login.');
-            patientId = data.patient.id
-            patientName = data.patient.name
-            patientEmail = data.patient.email
+            loggedIn = true;
+
+            patientId = data.patient.id;
+            patientName = data.patient.name;
+            patientEmail = data.patient.email;
+
+            // Persist to localStorage
+            localStorage.setItem('patientId', patientId);
+            localStorage.setItem('patientName', patientName);
+            localStorage.setItem('patientEmail', patientEmail);
+
+            alert('Signup successful!');
             showPage('home');
         } else {
-            // Signup failed
             alert(data.message || 'Signup failed. Please try again.');
         }
     } catch (error) {
@@ -169,11 +147,14 @@ signupForm.addEventListener('submit', async function (event) {
 });
 
 function logout() {
-    loggedIn = false
-    patientId = ""
-    patientEmail = ""
-    patientName = ""
-    showPage('login')
+    loggedIn = false;
+    patientId = "";
+    patientEmail = "";
+    patientName = "";
+    localStorage.removeItem('patientId');
+    localStorage.removeItem('patientName');
+    localStorage.removeItem('patientEmail');
+    showPage('login');
 }
 
 const toggleHeader = () => {
@@ -281,7 +262,7 @@ function showPage(pageId) {
     const targetPage = document.getElementById(pageId);
     if (targetPage) {
         targetPage.classList.add('active');
-        toggleHeader()
+        toggleHeader();
         console.log('Page activated:', pageId);
     } else {
         console.error('Page not found:', pageId);
@@ -297,14 +278,10 @@ function showPage(pageId) {
 
     // Load data based on page
     switch (pageId) {
-        case 'check-appointments':
-            loadAppointments(patientId);
-            break;
         case 'queue':
             loadQueueList();
             break;
         case 'home':
-            // Doctors are already in HTML, no need to load
             loadDoctors();
             console.log('Home page loaded');
             break;
@@ -323,12 +300,15 @@ function showPage(pageId) {
             console.log("patient email: " + patientEmail);
             loadProfile();
             break;
+        case 'time-slots':
+            loadTimeSlots();
+            break;
     }
 }
 
 function loadProfile() {
     console.log("Loading profile for:", { patientName, patientEmail, patientId });
-
+    
     // Check if user is logged in
     if (!patientId || !patientName) {
         showModal('Profile Error', 'Please login to view your profile.', 'error');
@@ -341,7 +321,7 @@ function loadProfile() {
     const nameElement = document.getElementById('profile-name');
     const emailElement = document.getElementById('profile-email');
     const idElement = document.getElementById('profile-id');
-
+    
     if (!avatarElement || !nameElement || !emailElement || !idElement) {
         console.error('Profile elements not found in DOM');
         showModal('Profile Error', 'Profile page not properly loaded. Please refresh.', 'error');
@@ -353,7 +333,7 @@ function loadProfile() {
     nameElement.textContent = patientName;
     emailElement.textContent = patientEmail;
     idElement.textContent = patientId;
-
+    
     console.log('✅ Profile loaded successfully');
     return true;
 }
@@ -481,7 +461,6 @@ function selectDate(dateStr, element) {
 }
 
 // Doctor management functions
-let doctors = [];
 async function loadDoctors() {
     const doctorsContainer = document.getElementById('doctors-grid');
     if (!doctorsContainer) return;
@@ -497,10 +476,6 @@ async function loadDoctors() {
         });
 
         const data = await response.json();
-        doctors = data;
-        console.log(doctors);
-
-        // doctors.forEach(d => {console.log(d.name)});
 
         if (response.ok && Array.isArray(data)) {
             doctorsContainer.innerHTML = '';
@@ -524,10 +499,10 @@ function createDoctorCard(doctor) {
 
     card.innerHTML = `
         <div class="doctor-info">
-            <div class="doctor-avatar">${`${doctor.name}`.charAt(4).toUpperCase()}</div>
+            <div class="doctor-avatar">${doctor.avatar}</div>
             <div class="doctor-details">
                 <h3>${doctor.name}</h3>
-                <div class="doctor-specialty">${doctor.specialization}</div>
+                <div class="doctor-specialty">${doctor.specialty}</div>
                 <div class="doctor-experience">Years of experience: ${doctor.experience}</div>
                 <div class="doctor-availability">Available: ${doctor.availability}</div>
             </div>
@@ -551,10 +526,10 @@ function updateSelectedDoctorInfo(doctor) {
     // Update all instances of selected doctor info
     const elements = {
         'selected-doctor-name': doctor.name,
-        'selected-doctor-specialty': doctor.specialization,
+        'selected-doctor-specialty': doctor.specialty,
         'selected-doctor-experience': doctor.experience,
         'selected-doctor-availability': doctor.availability,
-        'selected-avatar': doctor.name.charAt(4).toUpperCase()
+        'selected-avatar': doctor.avatar
     };
 
     Object.entries(elements).forEach(([id, value]) => {
@@ -590,20 +565,15 @@ function updateSelectedDoctorInfo(doctor) {
 }
 
 function showDoctorInfo(doctorId) {
-    if (doctors.length == 0) {
-        loadDoctors()
-    }
-
-
-    const doctor = doctors.find(d => d.doctorId === doctorId);
+    const doctor = sampleDoctors.find(d => d.doctorId === doctorId); // Note: This still uses sample; update to fetch if needed
     if (doctor) {
         showModal('Doctor Information', `
             <div style="text-align: center; margin-bottom: 20px;">
-                <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; margin: 0 auto 15px;">${doctor.name.charAt(4).toUpperCase()}</div>
+                <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; margin: 0 auto 15px;">${doctor.avatar}</div>
                 <h3>${doctor.name}</h3>
             </div>
             <div style="text-align: left;">
-                <p><strong>Specialty:</strong> ${doctor.specialization}</p>
+                <p><strong>Specialty:</strong> ${doctor.specialty}</p>
                 <p><strong>Experience:</strong> ${doctor.experience} years</p>
                 <p><strong>Availability:</strong> ${doctor.availability}</p>
                 <p><strong>Doctor ID:</strong> ${doctor.doctorId}</p>
@@ -613,6 +583,41 @@ function showDoctorInfo(doctorId) {
 }
 
 // Time slot functions
+async function loadTimeSlots() {
+    const timeSlotsContainer = document.getElementById('time-slots-grid');
+    if (!timeSlotsContainer) return;
+
+    timeSlotsContainer.innerHTML = '<div class="pulse" style="text-align: center; padding: 40px;">Loading time slots...</div>';
+
+    try {
+        const response = await fetch(`${API_BASE}/doctors/${selectedDoctor.doctorId}/slots?date=${selectedDate}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (response.ok && Array.isArray(data)) {
+            timeSlotsContainer.innerHTML = '';
+            data.forEach(time => {
+                const slot = document.createElement('div');
+                slot.className = 'time-slot';
+                slot.onclick = () => selectTimeSlot(slot);
+                slot.dataset.time = time;
+                slot.textContent = time;
+                timeSlotsContainer.appendChild(slot);
+            });
+        } else {
+            timeSlotsContainer.innerHTML = '<div class="empty-state"><h3>No time slots available</h3></div>';
+        }
+    } catch (error) {
+        console.error('Error loading time slots:', error);
+        timeSlotsContainer.innerHTML = '<div class="empty-state"><h3>Error loading time slots</h3></div>';
+    }
+}
+
 function selectTimeSlot(slot) {
     // Remove selected class from all slots
     document.querySelectorAll('.time-slot').forEach(s => {
@@ -624,11 +629,13 @@ function selectTimeSlot(slot) {
     selectedTime = slot.dataset.time;
 }
 
-//  Appointment booking with redirect to check appointments
+// Enhanced appointment booking with redirect to check appointments
 async function confirmAppointment() {
+    console.log("Appointing Patient ID : " + patientId);
+
     // Validation
     if (!patientId) {
-        showModal('Validation Error', 'Please enter a Patient ID.', 'error');
+        showModal('Validation Error', 'Please login to book an appointment.', 'error');
         return;
     }
 
@@ -748,80 +755,41 @@ async function loadQueueList() {
     const queueContainer = document.getElementById('queue-list');
     if (!queueContainer) return;
 
-    queueContainer.innerHTML = '<div class="pulse" style="text-align: center; padding: 40px;">Loading today\'s queue...</div>';
-
-    if (doctors.length === 0) {
-        await loadDoctors();
-    }
+    // Show loading state
+    queueContainer.innerHTML = '<div class="pulse" style="text-align: center; color: white; padding: 40px;">Loading queue information...</div>';
 
     try {
-        const response = await fetch(`${API_BASE}/appointments/queue`, {
+        const response = await fetch(`${API_BASE}/queue?patientId=${patientId}`, {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json' }
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
 
-        const doctorQueues = await response.json();
+        const data = await response.json();
 
-        if (response.ok && Array.isArray(doctorQueues) && doctorQueues.length > 0) {
+        if (response.ok && Array.isArray(data)) {
             queueContainer.innerHTML = '';
-
-            doctorQueues.forEach(doctorQueue => {
-                // Find the actual doctor name from global doctors array
-                const doctor = doctors.find(d => d.doctorId === doctorQueue.doctorId);
-                const actualDoctorName = doctor ? doctor.name : `Dr. ${doctorQueue.doctorId}`;
-
-                const doctorSection = document.createElement('div');
-                doctorSection.className = 'doctor-queue-section';
-
-                doctorSection.innerHTML = `
-        <h3 class="doctor-queue-title">${actualDoctorName}</h3>
-        <div class="doctor-appointments"></div>
-    `;
-
-                const appointmentsContainer = doctorSection.querySelector('.doctor-appointments');
-
-                doctorQueue.appointments.forEach(appointment => {
-                    const queueItem = document.createElement('div');
-                    queueItem.className = 'queue-item';
-
-                    const appointmentTime = new Date(appointment.dateTime).toLocaleString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-
-                    queueItem.innerHTML = `
-            <div class="queue-left">
-                <div class="queue-position">#${appointment.position}</div>
-            </div>
-            <div class="queue-right">
-                <div class="queue-main-info">
-                    <div class="queue-number">${appointment.queueNumber}</div>
-                    <div class="queue-time">${appointmentTime}</div>
-                </div>
-                <div class="queue-status-info">
-                    <div class="queue-wait">Wait: ${appointment.waitingTime}</div>
-                    <div class="queue-status">${appointment.checkedIn ? 'Checked In' : 'Waiting'}</div>
-                </div>
-            </div>
-        `;
-
-                    // Highlight current user's appointment
-                    if (appointment.patientId === patientId) {
-                        queueItem.classList.add('your-appointment');
-                    }
-
-                    appointmentsContainer.appendChild(queueItem);
-                });
-
-                queueContainer.appendChild(doctorSection);
+            data.forEach(item => {
+                const queueItem = createQueueItem(item);
+                queueContainer.appendChild(queueItem);
             });
         } else {
-            queueContainer.innerHTML = '<div class="empty-state"><h3>No appointments today</h3></div>';
+            queueContainer.innerHTML = `
+                <div class="empty-state">
+                    <h3>No patients in queue</h3>
+                    <p>The queue is currently empty.</p>
+                </div>
+            `;
         }
-
     } catch (error) {
+        queueContainer.innerHTML = `
+            <div class="empty-state">
+                <h3>Unable to load queue</h3>
+                <p>Please try again later.</p>
+            </div>
+        `;
         console.error('Queue loading error:', error);
-        queueContainer.innerHTML = '<div class="empty-state"><h3>Unable to load queue</h3></div>';
     }
 }
 
@@ -855,7 +823,7 @@ async function searchAppointments() {
     appointmentsList.innerHTML = '<div class="pulse" style="text-align: center; padding: 40px;">Searching appointments...</div>';
 
     try {
-        const response = await fetch(`${API_BASE}/appointments?patientId=${patientIdSearch}`, {
+            const response = await fetch(`${API_BASE}/appointments?patientId=${patientIdSearch}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -976,7 +944,7 @@ async function cancelAppointment(appointmentId) {
             showModal('Appointment Cancelled', 'Your appointment has been cancelled successfully.', 'success');
             // Refresh the appointments list
             setTimeout(() => {
-                loadAppointments(patientId);
+                location.reload(); // Refresh to show updated data
             }, 1500);
         } else {
             showModal('Cancellation Failed', data.message || 'Failed to cancel appointment.', 'error');
@@ -987,87 +955,6 @@ async function cancelAppointment(appointmentId) {
         showModal('Network Error', 'Unable to connect to server.', 'error');
         console.error('Cancellation error:', error);
     }
-}
-
-async function loadAppointments(patientId) {
-    try {
-        const response = await fetch(`${API_BASE}/appointments?patientId=${encodeURIComponent(patientId)}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch appointments: ${response.status}`);
-        }
-
-        const appointmentsFetched = await response.json();
-        console.log("Appointments fetched:", appointmentsFetched);
-        renderAppointments(appointmentsFetched);
-    } catch (error) {
-        console.error("Error fetching appointments:", error);
-        renderAppointments([]);
-        return [];
-    }
-}
-
-function renderAppointments(appointments) {
-    console.log("Appointments in render: " + appointments);
-    const container = document.getElementById('appointments-list');
-    if (!container) return;
-
-    container.innerHTML = '';
-
-    if (!appointments || appointments.length === 0) {
-        container.innerHTML = '<div class="empty-state"><h3>No appointments found</h3></div>';
-        return;
-    }
-
-    appointments.forEach(app => {
-        // Extract doctorId from doctorName (e.g., "Dr. DOC003" → "DOC003")
-        const doctorId = app.doctorName ? app.doctorName.replace('Dr. ', '') : null;
-        console.log('doctorId extracted:', doctorId);
-
-        const doctor = doctors.find(d => d.doctorId === doctorId);
-        const doctorDisplayName = doctor ? doctor.name : app.doctorName;
-
-        const card = document.createElement('div');
-        card.className = 'appointment-card';
-
-        const info = document.createElement('div');
-        info.className = 'appointment-info';
-        info.innerHTML = `
-            <div><strong>Appointment ID:</strong> ${app.appointmentId}</div>
-            <div><strong>Doctor:</strong> ${doctorDisplayName}</div>
-            <div><strong>Date & Time:</strong> ${new Date(app.dateTime).toLocaleString('en-US', {
-            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-        })}</div>
-            <div><strong>Status:</strong> <span class="status-badge status-${app.status}">${app.status}</span></div>
-            <div><strong>Queue Number:</strong> ${app.queueNumber || '-'}</div>
-            <div><strong>Patient ID:</strong> ${app.patientId}</div>
-        `;
-
-        // Rest of your code...
-        const actions = document.createElement('div');
-        actions.className = 'appointment-actions';
-
-        if (app.status === 'confirmed') {
-            actions.innerHTML = `
-                <button class="btn-secondary" onclick="modifyAppointment('${app.appointmentId}')">Modify</button>
-                <button class="btn-danger" onclick="cancelAppointment('${app.appointmentId}')">Cancel</button>
-                <button class="btn-primary" onclick="checkInPatient('${app.appointmentId}')">Check In</button>
-            `;
-        } else if (app.status === 'completed') {
-            actions.innerHTML = `<button class="btn-secondary" disabled>Completed</button>`;
-        } else if (app.status === 'cancelled') {
-            actions.innerHTML = `<button class="btn-secondary" disabled>Cancelled</button>`;
-        }
-
-        card.appendChild(info);
-        card.appendChild(actions);
-        container.appendChild(card);
-    });
 }
 
 async function modifyAppointment(appointmentId) {

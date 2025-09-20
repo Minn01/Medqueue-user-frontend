@@ -1,5 +1,12 @@
 {
-  "dependencies": {
-    "mongodb": "^6.19.0"
+  "name": "medqueue-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Medqueue application",
+  "scripts": {
+    "dev": "http-server -c-1 -p 8080 -o",
+    "start": "http-server -c-1 -p 8080"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
   }
 }
